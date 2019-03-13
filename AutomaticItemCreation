@@ -1,0 +1,55 @@
+#Template Path
+$global:TemplatePath = "/sitecore/templates/Site/mysample/Content Page"
+
+#Dialogue Box Configurations
+$dialog = Read-Variable -Parameters `
+    @{ Name = "media"; Title = "Source"; Root="/sitecore/media library/Documents/"; Editor="item"}, `
+    @{ Name = "folder"; Title = "Destination"; Root="/sitecore/content/Home/"; Editor="item"}`
+    -Description "This script will help you creating products automatically." `
+    -Width 800 -Height 600 `
+    -Title "Simple Product Creation Utility" `
+    -OkButtonName "Import" `
+    -CancelButtonName "Cancel"
+
+if ($dialog -ne "ok")
+{
+    Exit
+}
+
+
+#Media-conversion
+[system.io.stream]$body = $media.Fields["blob"].GetBlobStream()
+try
+{
+    $contents = New-Object byte[] $body.Length
+    $body.Read($contents, 0, $body.Length) | Out-Null
+}
+finally
+{
+    $body.Close()
+}
+
+$csv = [System.Text.Encoding]::Default.GetString($contents) | ConvertFrom-Csv
+$bulk = New-Object "Sitecore.Data.BulkUpdateContext"
+
+try
+{
+  foreach($record in $csv)
+    {
+
+      $item = New-Item -Path $folder.Paths.FullPath -Name $record.col2 -ItemType $global:TemplatePath
+      $item.Editing.BeginEdit()
+
+      $item["Meta Name"] = $record.col1
+      $item["Meta Description"] = $record.MetaDescription
+      $item["Name"] = $record.col2
+      $item["Description"] = $record.ProductDescription
+      $item.Editing.EndEdit()
+      Write-Host "Item created: " $record.col1
+    }
+}
+
+finally
+{
+    $bulk.Dispose()
+}
